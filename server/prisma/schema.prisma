@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Supabase pooled connection (port 6543, ?pgbouncer=true) for the app
+  url       = env("DATABASE_URL")
+  // Supabase direct connection (port 5432) for schema changes
+  directUrl = env("DIRECT_URL")
+}
+
+/// Only staff who sign in. Waiters are NOT users: they are registered by the
+/// distributor (see Waiter) and never have access to the system.
+enum UserRole {
+  manager
+  distributor
+}
+
+/// When the customer pays: at once, when the pot comes back, or later - but
+/// never more than 12 hours after the pot went out.
+enum PayTiming {
+  immediate
+  on_return
+  later
+}
+
+enum PayMethod {
+  mobile_money
+  cash
+  visa
+}
+
+/// out -> pot with the waiter/customer, timer running; returned -> back.
+/// (`issued` is legacy and no longer used.)
+enum TokenStatus {
+  issued
+  out
+  returned
+}
+
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// auth.users.id in Supabase Auth
+  authId    String   @unique @map("auth_id") @db.Uuid
+  name      String
+  email     String   @unique
+  role      UserRole
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Sign-in protection: 3 wrong passwords lock the account for 10 seconds.
+  failedAttempts Int       @default(0) @map("failed_attempts")
+  lastFailedAt   DateTime? @map("last_failed_at")
+  lockedUntil    DateTime? @map("locked_until")
+  alerts         Alert[]
+
+  clearedTokens   Token[]     @relation("TokenDistributor")
+  extensions      Extension[] @relation("ExtensionBy")
+  confirmedExts   Extension[] @relation("ExtensionConfirmedBy")
+  audits          AuditLog[]
+
+  @@map("users")
+}
+
+/// A waiter registered by the distributor. No login; just a name that tokens
+/// and pots are issued to.
+model Waiter {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  tokens    Token[]
+
+  @@map("waiters")
+}
+
+model Pot {
+  id     String  @id @default(uuid()) @db.Uuid
+  label  String  @unique
+  active Boolean @default(true)
+  tokens Token[]
+
+  @@map("pots")
+}
+
+/// The unit of tracking: which waiter has it, which distributor issued it, and when.
+model Token {
+  id               String      @id @default(uuid()) @db.Uuid
+  code             String      @unique @db.Char(6)
+  waiterId         String      @map("waiter_id") @db.Uuid
+  minutes          Int
+  amount           Decimal     @db.Decimal(12, 2)
+  method           PayMethod
+  status           TokenStatus @default(issued)
+  issuedAt         DateTime    @default(now()) @map("issued_at")
+  distributorId    String?     @map("distributor_id") @db.Uuid
+  potId            String?     @map("pot_id") @db.Uuid
+  clearedAt        DateTime?   @map("cleared_at")
+  returnedAt       DateTime?   @map("returned_at")
+  paymentConfirmed Boolean     @default(false) @map("payment_confirmed")
+  payTiming        PayTiming   @default(immediate) @map("pay_timing")
+  paidAt           DateTime?   @map("paid_at")
+  /// Deadline for unpaid tokens (issue time + 12 h).
+  payDueAt         DateTime?   @map("pay_due_at")
+
+  waiter      Waiter      @relation(fields: [waiterId], references: [id])
+  distributor User?       @relation("TokenDistributor", fields: [distributorId], references: [id])
+  pot         Pot?        @relation(fields: [potId], references: [id])
+  extensions  Extension[]
+  audits      AuditLog[]
+
+  @@index([issuedAt])
+  @@index([status])
+  @@index([paymentConfirmed])
+  @@map("tokens")
+}
+
+model Extension {
+  id            String    @id @default(uuid()) @db.Uuid
+  tokenId       String    @map("token_id") @db.Uuid
+  minutes       Int
+  fee           Decimal   @db.Decimal(12, 2)
+  method        PayMethod
+  byUserId      String    @map("by_user_id") @db.Uuid
+  at            DateTime  @default(now())
+  confirmed     Boolean   @default(true)
+  confirmedById String?   @map("confirmed_by_id") @db.Uuid
+
+  token       Token @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  by          User  @relation("ExtensionBy", fields: [byUserId], references: [id])
+  confirmedBy User? @relation("ExtensionConfirmedBy", fields: [confirmedById], references: [id])
+
+  @@map("extensions")
+}
+
+/// Append-only. The API never updates or deletes rows here.
+model AuditLog {
+  id      BigInt   @id @default(autoincrement())
+  at      DateTime @default(now())
+  actorId String   @map("actor_id") @db.Uuid
+  action  String
+  detail  String
+  tokenId String?  @map("token_id") @db.Uuid
+
+  actor User   @relation(fields: [actorId], references: [id])
+  token Token? @relation(fields: [tokenId], references: [id])
+
+  @@index([at])
+  @@map("audit_log")
+}
+
+/// Raised for the manager when a user is locked out; stays open until the
+/// manager renews the user's password or dismisses it.
+model Alert {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @map("user_id") @db.Uuid
+  type       String    @default("LOCKOUT")
+  message    String
+  createdAt  DateTime  @default(now()) @map("created_at")
+  resolvedAt DateTime? @map("resolved_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([resolvedAt])
+  @@map("alerts")
+}
+
+/// Single row (id = 1) holding the manager's SMTP configuration.
+model Setting {
+  id   Int  @id @default(1)
+  smtp Json @default("{}")
+
+  @@map("settings")
+}

@@ -1,0 +1,34 @@
+name: potie
+description: Shisha pot issuing, tracking and audit app for bars (manager, waiter, distributor roles).
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  esc_pos_utils_plus: ^2.0.4
+  flutter:
+    sdk: flutter
+  flutter_local_notifications: ^23.0.2
+  http: ^1.6.0
+  image: ^4.13.1
+  intl: ^0.20.3
+  pdf: ^3.13.1
+  permission_handler: ^13.0.2
+  print_bluetooth_thermal: ^1.2.5
+  printing: ^5.15.1
+  provider: ^6.1.5+1
+  shared_preferences: ^2.5.6
+  supabase_flutter: ^2.18.3
+  timezone: ^0.11.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
