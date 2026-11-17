@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -6,12 +7,16 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../core/models.dart';
 import 'backend.dart';
+import 'resilient_http.dart';
 
 /// Talks to the Node/Prisma API in /server. Authentication is Supabase Auth;
 /// every request carries the Supabase access token which the server verifies.
 class HttpBackend implements Backend {
   HttpBackend(this.baseUrl);
   final String baseUrl;
+
+  /// Falls back to a public DNS lookup on networks that can't find the server.
+  final http.Client _http = createApiClient();
   GoTrueClient get _auth => Supabase.instance.client.auth;
 
   Future<Map<String, String>> _headers() async {
@@ -30,18 +35,32 @@ class HttpBackend implements Backend {
     final headers = await _headers();
     final http.Response res;
     try {
-      res = switch (method) {
-        'GET' => await http.get(uri, headers: headers),
-        'POST' =>
-          await http.post(uri, headers: headers, body: jsonEncode(body ?? {})),
-        'PUT' =>
-          await http.put(uri, headers: headers, body: jsonEncode(body ?? {})),
-        'PATCH' => await http.patch(uri,
-            headers: headers, body: jsonEncode(body ?? {})),
-        _ => throw ArgumentError(method),
-      };
+      // The free host sleeps when idle and takes up to ~1 minute to wake, so
+      // allow that long and try a second time if the first connection drops.
+      Future<http.Response> once() {
+        final f = switch (method) {
+          'GET' => _http.get(uri, headers: headers),
+          'POST' => _http.post(uri, headers: headers, body: jsonEncode(body ?? {})),
+          'PUT' => _http.put(uri, headers: headers, body: jsonEncode(body ?? {})),
+          'PATCH' => _http.patch(uri, headers: headers, body: jsonEncode(body ?? {})),
+          _ => throw ArgumentError(method),
+        };
+        return f.timeout(const Duration(seconds: 75));
+      }
+
+      res = await () async {
+        try {
+          return await once();
+        } on http.ClientException {
+          await Future<void>.delayed(const Duration(seconds: 3));
+          return await once();
+        }
+      }();
+    } on TimeoutException {
+      throw BackendException(
+          'The server is taking too long to answer (it may be waking up). Wait a minute and try again.');
     } on http.ClientException {
-      throw BackendException('Cannot reach the server. Check your connection.');
+      throw BackendException('Cannot reach the server. Check your internet connection.');
     }
     // The access token may have expired while the app sat idle: refresh once and retry.
     if (res.statusCode == 401 && !retried && _auth.currentSession != null) {
