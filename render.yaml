@@ -1,0 +1,37 @@
+# Render blueprint: hosts the Potie API (the /server folder) online so the app
+# works from any network. Secrets are NOT stored here; Render asks for them.
+services:
+  - type: web
+    name: arrows-bar-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: APP_NAME
+        value: Arrows Bar
+      # Supabase > Project Settings > Database > Connection string
+      - key: DATABASE_URL        # pooled (port 6543, ?pgbouncer=true)
+        sync: false
+      - key: DIRECT_URL          # direct/session (port 5432)
+        sync: false
+      # Supabase > Project Settings > API
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Optional: email for login details (or set it later in the app's Email setup)
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false

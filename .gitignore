@@ -100,3 +100,7 @@ desktop.ini
 *.bak
 *.orig
 tmp/
+
+# Kotlin compiler session files
+.kotlin/
+**/.kotlin/
