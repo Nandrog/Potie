@@ -218,7 +218,11 @@ class RoleScaffold extends StatelessWidget {
         title: Row(children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.asset('assets/images/logo.png', width: 32, height: 32),
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(2),
+              child: Image.asset('assets/images/arrows_bar_logo.png', width: 32, height: 32),
+            ),
           ),
           const SizedBox(width: 10),
           Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),

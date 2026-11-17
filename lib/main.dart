@@ -53,7 +53,7 @@ class PotieApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Potie',
+      title: 'Arrows Bar',
       debugShowCheckedModeBanner: false,
       theme: Brand.theme(Brightness.light),
       darkTheme: Brand.theme(Brightness.dark),

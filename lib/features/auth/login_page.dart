@@ -78,20 +78,17 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     Center(
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(28),
-                        child: Image.asset('assets/images/logo.png',
-                            width: 140, height: 140),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          color: Colors.white,
+                          padding: const EdgeInsets.all(12),
+                          child: Image.asset('assets/images/arrows_bar_logo.png',
+                              width: 200),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    Text('Potie',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 34,
-                            fontWeight: FontWeight.w800,
-                            color: Brand.amberText(context))),
-                    const SizedBox(height: 4),
-                    Text('Shisha pot tracking',
+                    const SizedBox(height: 12),
+                    Text('Pot tracking',
                         textAlign: TextAlign.center,
                         style: TextStyle(color: Theme.of(context).hintColor)),
                     const SizedBox(height: 32),
