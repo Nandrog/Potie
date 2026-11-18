@@ -12,27 +12,66 @@ import '../print/printer_setup.dart';
 import 'payments.dart';
 import 'pots_tab.dart';
 import 'waiters_tab.dart';
+import '../../widgets/shell.dart';
 
 /// The distributor runs the whole floor: registers waiters, issues tokens to
 /// them, extends time and records pots as returned. Waiters never sign in.
-class DistributorHome extends StatelessWidget {
+/// Four screens in the bottom bar; Pots and the printer are in the side menu.
+class DistributorHome extends StatefulWidget {
   const DistributorHome({super.key});
   @override
+  State<DistributorHome> createState() => _DistributorHomeState();
+}
+
+class _DistributorHomeState extends State<DistributorHome> {
+  int _i = 0;
+  final _search = SearchQuery();
+
+  static const _titles = ['Issue token', 'Live timers', 'Unpaid', 'Waiters'];
+  static const _hints = ['', 'Search pots or waiters', 'Search unpaid', 'Search waiters'];
+  static const _searchable = [false, true, true, true];
+  static const _pages = <Widget>[_IssueTab(), _OutTab(), UnpaidTab(), WaitersTab()];
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return const DefaultTabController(
-      length: 5,
+    return ChangeNotifierProvider.value(
+      value: _search,
       child: RoleScaffold(
-        title: 'Distributor',
-        actions: [NotifyButton(), PrinterButton()],
-        bottom: TabBar(isScrollable: true, tabAlignment: TabAlignment.start, tabs: [
-          Tab(icon: Icon(Icons.add_circle_outline), text: 'Issue token'),
-          Tab(icon: Icon(Icons.timer_outlined), text: 'Live'),
-          Tab(icon: Icon(Icons.hourglass_bottom), text: 'Unpaid'),
-          Tab(icon: Icon(Icons.badge_outlined), text: 'Waiters'),
-          Tab(icon: Icon(Icons.inventory_2_outlined), text: 'Pots'),
-        ]),
-        body: TabBarView(
-            children: [_IssueTab(), _OutTab(), UnpaidTab(), WaitersTab(), PotsTab()]),
+        title: _titles[_i],
+        searchable: _searchable[_i],
+        searchHint: _hints[_i],
+        drawerEntries: [
+          DrawerEntry(
+              Icons.inventory_2_outlined,
+              'Pots',
+              (c) => SubPage.open(c,
+                  title: 'Pots',
+                  child: const PotsTab(),
+                  searchable: true,
+                  hint: 'Search pots')),
+          DrawerEntry(Icons.print_outlined, 'Printer',
+              (c) => showDialog<void>(context: c, builder: (_) => const PrinterSetupDialog())),
+        ],
+        body: IndexedStack(index: _i, children: _pages),
+        bottomNav: NavigationBar(
+          selectedIndex: _i,
+          onDestinationSelected: (v) {
+            _search.reset();
+            setState(() => _i = v);
+          },
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.add_circle_outline), label: 'Issue'),
+            NavigationDestination(icon: Icon(Icons.timer_outlined), label: 'Live'),
+            NavigationDestination(icon: Icon(Icons.hourglass_bottom), label: 'Unpaid'),
+            NavigationDestination(icon: Icon(Icons.badge_outlined), label: 'Waiters'),
+          ],
+        ),
       ),
     );
   }

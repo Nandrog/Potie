@@ -6,6 +6,7 @@ import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../widgets/common.dart';
 import 'day_tab.dart';
+import '../../widgets/shell.dart';
 
 class AuditTab extends StatefulWidget {
   const AuditTab({super.key});
@@ -33,7 +34,11 @@ class _AuditTabState extends State<AuditTab> {
 
   @override
   Widget build(BuildContext context) {
-    final l = _list;
+    final q = context.watch<SearchQuery>();
+    final all = _list;
+    final l = all
+        ?.where((a) => q.matches([a.detail, a.action.replaceAll('_', ' '), a.actorName]))
+        .toList();
     return Column(children: [
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -53,9 +58,12 @@ class _AuditTabState extends State<AuditTab> {
             : RefreshIndicator(
                 onRefresh: _load,
                 child: l.isEmpty
-                    ? ListView(children: const [
-                        SizedBox(height: 120),
-                        Center(child: Text('No activity on this day.')),
+                    ? ListView(children: [
+                        const SizedBox(height: 120),
+                        if (q.filtering && (all?.isNotEmpty ?? false))
+                          NoResults(q)
+                        else
+                          const Center(child: Text('No activity on this day.')),
                       ])
                     : ListView.separated(
                         padding: const EdgeInsets.all(16),

@@ -5,6 +5,7 @@ import '../../core/format.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../widgets/common.dart';
+import '../../widgets/shell.dart';
 
 class DayPicker extends StatelessWidget {
   const DayPicker({super.key, required this.day, required this.onChanged});
@@ -63,6 +64,13 @@ class _DayTabState extends State<DayTab> {
   @override
   Widget build(BuildContext context) {
     final s = _s;
+    final q = context.watch<SearchQuery>();
+    final moves = s == null
+        ? const <PotToken>[]
+        : s.tokens.reversed
+            .where((t) => q.matches(
+                [t.potLabel, t.waiterName, t.distributorName, t.method.label, t.status.name]))
+            .toList();
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -103,7 +111,8 @@ class _DayTabState extends State<DayTab> {
             Text('Pot movements (${s.tokens.length})',
                 style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 8),
-            for (final t in s.tokens.reversed) ...[
+            if (moves.isEmpty && s.tokens.isNotEmpty) NoResults(q),
+            for (final t in moves) ...[
               _Movement(t),
               const SizedBox(height: 10),
             ],

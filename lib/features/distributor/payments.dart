@@ -8,6 +8,7 @@ import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
+import '../../widgets/shell.dart';
 
 /// Asks how an unpaid token was paid and records it. Returns the updated token
 /// (null if cancelled or it failed).
@@ -178,15 +179,22 @@ class _UnpaidTabState extends State<UnpaidTab> {
 
   @override
   Widget build(BuildContext context) {
-    final list = _list;
-    if (list == null) return const Center(child: CircularProgressIndicator());
+    final all = _list;
+    if (all == null) return const Center(child: CircularProgressIndicator());
+    final q = context.watch<SearchQuery>();
+    final list = all
+        .where((t) => q.matches([t.potLabel, t.waiterName, t.payTiming.label]))
+        .toList();
     final total = list.fold(0.0, (s, t) => s + t.amount);
     return RefreshIndicator(
       onRefresh: _load,
       child: list.isEmpty
-          ? ListView(children: const [
-              SizedBox(height: 160),
-              Center(child: Text('Nothing is waiting for payment.')),
+          ? ListView(children: [
+              const SizedBox(height: 160),
+              Center(
+                  child: all.isNotEmpty
+                      ? NoResults(q)
+                      : const Text('Nothing is waiting for payment.')),
             ])
           : ListView(
               padding: const EdgeInsets.all(16),

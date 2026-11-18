@@ -5,6 +5,7 @@ import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../widgets/common.dart';
 import '../../widgets/login_details.dart';
+import '../../widgets/shell.dart';
 
 class TeamTab extends StatefulWidget {
   const TeamTab({super.key});
@@ -46,7 +47,10 @@ class _TeamTabState extends State<TeamTab> {
 
   @override
   Widget build(BuildContext context) {
-    final users = _users;
+    final q = context.watch<SearchQuery>();
+    final users = _users
+        ?.where((u) => q.matches([u.name, u.email, u.role.label]))
+        .toList();
     final me = context.read<Session>().user!;
     return Scaffold(
       backgroundColor: Colors.transparent,

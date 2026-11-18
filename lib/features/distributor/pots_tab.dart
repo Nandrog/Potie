@@ -7,6 +7,7 @@ import '../../core/session.dart';
 import '../../core/theme.dart';
 import '../../widgets/common.dart';
 import '../print/print_service.dart';
+import '../../widgets/shell.dart';
 
 /// Pot inventory: register pots (random unique numbers), retire them, print tags.
 class PotsTab extends StatefulWidget {
@@ -67,6 +68,10 @@ class _PotsTabState extends State<PotsTab> {
   Widget build(BuildContext context) {
     final pots = _pots;
     if (pots == null) return const Center(child: CircularProgressIndicator());
+    final q = context.watch<SearchQuery>();
+    final shown = pots
+        .where((p) => q.matches([p.label, p.active ? (p.out ? 'out' : 'available') : 'retired']))
+        .toList();
     final active = pots.where((p) => p.active).toList();
     final out = active.where((p) => p.out).length;
     final available = active.length - out;
@@ -111,7 +116,8 @@ class _PotsTabState extends State<PotsTab> {
                       textAlign: TextAlign.center),
                 ),
               ),
-            for (final p in pots)
+            if (shown.isEmpty && pots.isNotEmpty) NoResults(q),
+            for (final p in shown)
               Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: ListTile(

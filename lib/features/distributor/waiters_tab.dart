@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../widgets/common.dart';
+import '../../widgets/shell.dart';
 
 /// The distributor registers the waiters. They have no login; a waiter just
 /// needs to exist so pots and tokens can be issued to them by name.
@@ -78,7 +79,9 @@ class _WaitersTabState extends State<WaitersTab> {
 
   @override
   Widget build(BuildContext context) {
-    final list = _waiters;
+    final q = context.watch<SearchQuery>();
+    final all = _waiters;
+    final list = all?.where((w) => q.matches([w.name])).toList();
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton.extended(
@@ -91,9 +94,12 @@ class _WaitersTabState extends State<WaitersTab> {
           : RefreshIndicator(
               onRefresh: _load,
               child: list.isEmpty
-                  ? ListView(children: const [
-                      SizedBox(height: 160),
-                      Center(child: Text('No waiters yet. Tap “Register waiter”.')),
+                  ? ListView(children: [
+                      const SizedBox(height: 160),
+                      Center(
+                          child: (all?.isNotEmpty ?? false) && q.filtering
+                              ? NoResults(q)
+                              : const Text('No waiters yet. Tap “Register waiter”.')),
                     ])
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),

@@ -11,6 +11,7 @@ import '../core/notifier.dart';
 import '../core/theme.dart';
 import '../features/distributor/payments.dart' show PaymentNote;
 import 'common.dart';
+import 'shell.dart' show NoResults, SearchQuery;
 
 /// Live view of every pot that is out: a progress bar per pot that fills as
 /// its time runs down, sorted so the pot closest to (or past) its time is first.
@@ -31,6 +32,8 @@ class LiveBoard extends StatelessWidget {
               : const CircularProgressIndicator());
     }
     final list = live.tokens;
+    final q = context.watch<SearchQuery>();
+    final shown = list.where((t) => q.matches([t.potLabel, t.waiterName])).toList();
     return RefreshIndicator(
       onRefresh: live.refresh,
       child: ListView(
@@ -54,8 +57,10 @@ class LiveBoard extends StatelessWidget {
               padding: EdgeInsets.only(top: 120),
               child: Center(child: Text('No pots are out.')),
             )
+          else if (shown.isEmpty)
+            NoResults(q)
           else
-            for (final t in list)
+            for (final t in shown)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _LiveCard(
@@ -231,22 +236,31 @@ class NotifyButton extends StatelessWidget {
   const NotifyButton({super.key});
   @override
   Widget build(BuildContext context) {
-    final n = context.read<LiveTokens>().notifier;
-    if (n == null || !TimeUpNotifier.supported) return const SizedBox.shrink();
+    if (context.read<LiveTokens>().notifier == null || !TimeUpNotifier.supported) {
+      return const SizedBox.shrink();
+    }
     return IconButton(
       tooltip: 'Turn on time-up alerts',
       icon: const Icon(Icons.notifications_active_outlined),
-      onPressed: () async {
-        final ok = await n.requestPermission();
-        if (context.mounted) {
-          toast(
-              context,
-              ok
-                  ? 'Time-up alerts are on.'
-                  : 'Alerts are blocked. Allow notifications for this app in settings.',
-              error: !ok);
-        }
-      },
+      onPressed: () => enableTimeUpAlerts(context),
     );
+  }
+}
+
+/// Asks permission to show "time is up" notifications (browsers need a tap).
+Future<void> enableTimeUpAlerts(BuildContext context) async {
+  final n = context.read<LiveTokens>().notifier;
+  if (n == null || !TimeUpNotifier.supported) {
+    toast(context, 'Alerts are not available on this device.', error: true);
+    return;
+  }
+  final ok = await n.requestPermission();
+  if (context.mounted) {
+    toast(
+        context,
+        ok
+            ? 'Time-up alerts are on.'
+            : 'Alerts are blocked. Allow notifications for this app in settings.',
+        error: !ok);
   }
 }

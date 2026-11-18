@@ -4,12 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../core/format.dart';
 import '../core/models.dart';
-import '../core/session.dart';
 import '../core/theme.dart';
 import '../features/print/print_service.dart';
-import '../features/profile/profile_page.dart';
 import '../features/distributor/payments.dart' show PaymentNote;
 import 'live_board.dart' show DueAlertHost;
+import 'shell.dart';
 import 'package:provider/provider.dart';
 
 void toast(BuildContext c, String msg, {bool error = false}) {
@@ -193,6 +192,9 @@ class ThemeToggleButton extends StatelessWidget {
   }
 }
 
+/// The frame every signed-in screen uses: a menu button (side menu), the title
+/// or - while searching - a search box, and an optional bottom bar.
+/// Needs a [SearchQuery] provided above it.
 class RoleScaffold extends StatelessWidget {
   const RoleScaffold({
     super.key,
@@ -200,58 +202,60 @@ class RoleScaffold extends StatelessWidget {
     required this.body,
     this.actions = const [],
     this.fab,
-    this.bottom,
     this.bottomNav,
+    this.drawerEntries = const [],
+    this.searchable = false,
+    this.searchHint,
   });
   final String title;
   final Widget body;
   final List<Widget> actions;
   final Widget? fab;
-  final Widget? bottom;
   final Widget? bottomNav;
+  final List<DrawerEntry> drawerEntries;
+
+  /// Show the search icon (the current screen has a list to filter).
+  final bool searchable;
+  final String? searchHint;
 
   @override
   Widget build(BuildContext context) {
-    final s = context.watch<Session>();
+    final q = context.watch<SearchQuery>();
+    final searching = q.active && searchable;
     return Scaffold(
       appBar: AppBar(
-        title: Row(children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(2),
-              child: Image.asset('assets/images/arrows_bar_logo.png', width: 32, height: 32),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
-        ]),
-        actions: [
-          ...actions,
-          const ThemeToggleButton(),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle_outlined),
-            onSelected: (v) {
-              if (v == 'profile') {
-                Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const ProfilePage()));
-              } else if (v == 'out') {
-                s.signOut();
-              }
-            },
-            itemBuilder: (_) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Text('${s.user!.name}\n${s.user!.role.label}'),
-              ),
-              const PopupMenuItem(value: 'profile', child: Text('Profile & settings')),
-              const PopupMenuItem(value: 'out', child: Text('Sign out')),
-            ],
-          ),
-        ],
-        bottom: bottom as PreferredSizeWidget?,
+        title: searching
+            ? SearchField(query: q, hint: searchHint)
+            : Row(children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.all(2),
+                    child: Image.asset('assets/images/arrows_bar_logo.png',
+                        width: 32, height: 32),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Flexible(child: Text(title, overflow: TextOverflow.ellipsis)),
+              ]),
+        actions: searching
+            ? [
+                IconButton(
+                    tooltip: 'Close search',
+                    icon: const Icon(Icons.close),
+                    onPressed: q.close),
+              ]
+            : [
+                if (searchable)
+                  IconButton(
+                      tooltip: 'Search',
+                      icon: const Icon(Icons.search),
+                      onPressed: q.open),
+                ...actions,
+              ],
       ),
+      drawer: AppDrawer(entries: drawerEntries),
       floatingActionButton: fab,
       bottomNavigationBar: bottomNav,
       body: DueAlertHost(child: body),
