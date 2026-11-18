@@ -22,6 +22,7 @@
     "nodemailer": "^6.9.13"
   },
   "devDependencies": {
-    "prisma": "^5.22.0"
+    "prisma": "^5.22.0",
+    "tus-js-client": "^4.3.1"
   }
 }

@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { spawnSync } = require('child_process');
+const tus = require('tus-js-client');
 const { supabase } = require('../src/clients');
 
 const ROOT = path.resolve(__dirname, '..', '..');
@@ -34,6 +35,43 @@ function readVersion() {
 function writeVersion(name, build) {
   const txt = fs.readFileSync(PUBSPEC, 'utf8').replace(/^version:\s*.*$/m, `version: ${name}+${build}`);
   fs.writeFileSync(PUBSPEC, txt);
+}
+
+
+// Retries a step that failed because the connection dropped.
+async function retry(label, fn, tries = 8) {
+  for (let i = 1; ; i++) {
+    try { return await fn(); }
+    catch (e) {
+      if (i >= tries) throw e;
+      console.log(`  ${label}: ${e.message}; retrying (${i}/${tries - 1})...`);
+      await new Promise((r) => setTimeout(r, Math.min(2000 * i, 15000)));
+    }
+  }
+}
+
+// Large files go up in resumable 6 MB pieces that retry on their own, so a flaky
+// connection slows the upload down instead of failing it.
+function uploadResumable(buffer, objectName, contentType) {
+  return new Promise((resolve, reject) => {
+    let lastPct = -1;
+    const up = new tus.Upload(buffer, {
+      endpoint: `${process.env.SUPABASE_URL}/storage/v1/upload/resumable`,
+      retryDelays: [0, 2000, 5000, 10000, 20000, 30000, 30000, 30000],
+      headers: { authorization: `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`, 'x-upsert': 'true' },
+      uploadDataDuringCreation: true,
+      removeFingerprintOnSuccess: true,
+      metadata: { bucketName: BUCKET, objectName, contentType, cacheControl: '3600' },
+      chunkSize: 6 * 1024 * 1024, // Supabase requires exactly 6 MB pieces
+      onError: reject,
+      onProgress: (sent, total) => {
+        const pct = Math.floor((sent / total) * 100 / 10) * 10;
+        if (pct !== lastPct) { lastPct = pct; console.log(`  uploading ${objectName}: ${pct}%`); }
+      },
+      onSuccess: resolve,
+    });
+    up.start();
+  });
 }
 
 (async () => {
@@ -60,16 +98,13 @@ function writeVersion(name, build) {
   if (mb > 49) console.warn('Warning: over 50 MB - the free Supabase plan will reject this upload.');
 
   // Public bucket (created on first release).
-  const made = await supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 52428800 });
+  const made = await retry('create bucket', () => supabase.storage.createBucket(BUCKET, { public: true, fileSizeLimit: 52428800 }));
   if (made.error && !/already exists|duplicate/i.test(made.error.message)) throw made.error;
-  await supabase.storage.updateBucket(BUCKET, { public: true, fileSizeLimit: 52428800 });
+  await retry('update bucket', () => supabase.storage.updateBucket(BUCKET, { public: true, fileSizeLimit: 52428800 }));
 
   const pub = (f) => `${process.env.SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${f}`;
   const apkName = `arrows-bar-${build}.apk`;
-  const up = await supabase.storage.from(BUCKET).upload(apkName, apk, {
-    contentType: 'application/vnd.android.package-archive', upsert: true, cacheControl: '3600',
-  });
-  if (up.error) throw up.error;
+  await uploadResumable(apk, apkName, 'application/vnd.android.package-archive');
 
   // A later build must be published before it can be marked as the minimum.
   const manifest = {
@@ -78,12 +113,12 @@ function writeVersion(name, build) {
     apkUrl: pub(apkName),
     sha256,
     notes: opt('notes') || '',
-    minVersionCode: flag('min') ? build : (await currentMin()),
+    minVersionCode: flag('min') ? build : (await retry('read version', currentMin)),
     publishedAt: new Date().toISOString(),
   };
-  const mv = await supabase.storage.from(BUCKET).upload('version.json', Buffer.from(JSON.stringify(manifest, null, 2)), {
+  const mv = await retry('publish version.json', () => supabase.storage.from(BUCKET).upload('version.json', Buffer.from(JSON.stringify(manifest, null, 2)), {
     contentType: 'application/json', upsert: true, cacheControl: '30',
-  });
+  }));
   if (mv.error) throw mv.error;
 
   console.log('\nPublished.');
@@ -95,9 +130,7 @@ function writeVersion(name, build) {
 
 // Keep the existing "must update" floor unless --min raises it.
 async function currentMin() {
-  try {
-    const { data } = await supabase.storage.from(BUCKET).download('version.json');
-    if (!data) return 0;
-    return JSON.parse(await data.text()).minVersionCode || 0;
-  } catch { return 0; }
+  const { data, error } = await supabase.storage.from(BUCKET).download('version.json');
+  if (error || !data) return 0; // nothing published yet
+  return JSON.parse(await data.text()).minVersionCode || 0;
 }
