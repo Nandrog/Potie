@@ -86,6 +86,18 @@ void main() {
         throwsA(isA<BackendException>()));
   });
 
+  test('enrolling returns a temporary password the manager can hand over', () async {
+    final b = DemoBackend();
+    await b.signIn(mgrEmail, mgrPw);
+    final r = await b.enrollUser(
+        name: 'New Distro', email: 'new.distro@potie.app', role: Role.distributor);
+    expect(r.user.role, Role.distributor);
+    expect(r.tempPassword, isNotNull);
+    await b.signOut();
+    final u = await b.signIn('new.distro@potie.app', r.tempPassword!);
+    expect(u.name, 'New Distro');
+  });
+
   test('waiters have no login', () async {
     final b = DemoBackend();
     await expectLater(b.signIn('waiter1@potie.app', 'Waiter@123'),

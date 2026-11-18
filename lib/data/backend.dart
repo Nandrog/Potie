@@ -63,7 +63,7 @@ abstract class Backend {
   Future<List<PotToken>> tokensBetween(DateTime from, DateTime to);
   Future<List<AuditEntry>> auditBetween(DateTime from, DateTime to);
   Future<List<AppUser>> users();
-  Future<AppUser> enrollUser({
+  Future<EnrollResult> enrollUser({
     required String name,
     required String email,
     required Role role,
@@ -72,7 +72,7 @@ abstract class Backend {
   Future<AppUser> editUser(String userId,
       {required String name, required String email});
   /// Sets a new temporary password, emails it, lifts any lockout and closes
-  /// the user's alerts. The password is only emailed, never returned.
+  /// the user's alerts. Returns the new password so the manager can hand it over.
   Future<String?> resendCredentials(String userId);
 
   // Lockout alerts

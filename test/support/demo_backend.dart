@@ -519,7 +519,7 @@ class DemoBackend implements Backend {
   Future<List<AppUser>> users() async => List.of(_users);
 
   @override
-  Future<AppUser> enrollUser(
+  Future<EnrollResult> enrollUser(
       {required String name, required String email, required Role role}) async {
     _need(Role.manager);
     final e = email.trim().toLowerCase();
@@ -528,9 +528,10 @@ class DemoBackend implements Backend {
     }
     final u = AppUser(id: 'u${_seq++}', name: name.trim(), email: e, role: role);
     _users.add(u);
-    _passwords[e] = 'Temp#${_rng.nextInt(9000) + 1000}';
+    final pw = 'Temp#${_rng.nextInt(9000) + 1000}';
+    _passwords[e] = pw;
     _log(_actor, 'USER_ENROLLED', '${u.name} (${role.label}) enrolled');
-    return u;
+    return EnrollResult(u, tempPassword: pw);
   }
 
   @override

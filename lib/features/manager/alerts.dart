@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../widgets/login_details.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/format.dart';
@@ -83,23 +84,28 @@ class _AlertsPageState extends State<AlertsPage> {
       context: context,
       builder: (c) => AlertDialog(
         title: Text('Renew password for ${a.userName}?'),
-        content: Text('A new temporary password will be emailed to ${a.userEmail} '
-            'and the lockout will be lifted.'),
+        content: Text('A new temporary password is created for ${a.userName} '
+            'and the lockout is lifted. You then send them the password.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(minimumSize: const Size(110, 40)),
             onPressed: () => Navigator.pop(c, true),
-            child: const Text('Email password'),
+            child: const Text('Renew password'),
           ),
         ],
       ),
     );
     if (ok != true || !mounted) return;
     final b = context.read<Session>().backend;
-    final r = await guarded(context, () async => (await b.resendCredentials(a.userId)) ?? '');
-    if (r == null || !mounted) return;
-    toast(context, 'New password emailed to ${a.userEmail}.');
+    final pw = await guarded(context, () => b.resendCredentials(a.userId));
+    if (pw == null || !mounted) return;
+    await showLoginDetails(context,
+        name: a.userName,
+        email: a.userEmail,
+        role: a.userRole.label,
+        password: pw,
+        renewed: true);
     _load();
   }
 

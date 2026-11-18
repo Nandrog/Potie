@@ -53,6 +53,15 @@ extension RoleX on Role {
 /// (`issued` is legacy and no longer produced.)
 enum TokenStatus { issued, out, returned }
 
+/// Result of enrolling someone: the account and the temporary password, which
+/// the manager hands over (email app, WhatsApp, SMS...) - it works without the
+/// server's own email being set up.
+class EnrollResult {
+  final AppUser user;
+  final String? tempPassword;
+  const EnrollResult(this.user, {this.tempPassword});
+}
+
 class AppUser {
   final String id;
   final String name;

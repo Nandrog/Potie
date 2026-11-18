@@ -91,6 +91,13 @@ const isUuid = (s) => /^[0-9a-f-]{36}$/i.test(String(s));
 const uuidParam = (req, _res, next) =>
   Object.values(req.params).every(isUuid) ? next() : next(httpError(400, 'Bad id.'));
 
+// Sends login details by email if SMTP is set up; failures are only logged.
+function emailInBackground(to, mail) {
+  getSmtp()
+    .then((smtp) => (smtp.host ? send({ to, ...mail }) : null))
+    .catch((e) => console.error('login email not sent:', e.message));
+}
+
 const randomCode = () => String(crypto.randomInt(100000, 1000000));
 
 // ---------------------------------------------------------------- routes
@@ -498,9 +505,6 @@ app.post('/manager/users', ...mgr, wrap(async (req, res) => {
     throw httpError(400, 'Name, valid email and role are required.');
   if (await prisma.user.findUnique({ where: { email } }))
     throw httpError(409, 'A user with that email already exists.');
-  const smtp = await getSmtp();
-  if (!smtp.host) throw httpError(400, 'Set up SMTP first (Email setup tab).');
-
   const password = tempPassword();
   const { data, error } = await supabase.auth.admin.createUser({
     email, password, email_confirm: true, user_metadata: { name },
@@ -518,13 +522,11 @@ app.post('/manager/users', ...mgr, wrap(async (req, res) => {
     await supabase.auth.admin.deleteUser(data.user.id).catch(() => {});
     throw e;
   }
-  try {
-    await send({ to: email, ...inviteMail({ name, email, role, password }) });
-  } catch (e) {
-    throw httpError(e.status || 502,
-      `${name} was enrolled but the email failed (${e.message}). Fix SMTP then use “Email new login details”.`);
-  }
-  res.status(201).json(publicUser(user));
+  // Email is a bonus, never a requirement: the manager's app also receives the temporary
+  // password and can hand it over by email app, WhatsApp, SMS, etc. Not awaited, so a
+  // blocked mail port can never slow down or fail enrolment.
+  emailInBackground(email, inviteMail({ name, email, role, password }));
+  res.status(201).json({ ...publicUser(user), temp_password: password });
 }));
 
 app.patch('/manager/users/:id', ...mgr, uuidParam, wrap(async (req, res) => {
@@ -564,9 +566,8 @@ app.post('/manager/users/:id/resend', ...mgr, uuidParam, wrap(async (req, res) =
     await tx.alert.updateMany({ where: { userId: u.id, resolvedAt: null }, data: { resolvedAt: new Date() } });
     await audit(tx, req.user.id, 'CREDENTIALS_SENT', `New login details emailed to ${u.name}`);
   });
-  // The password is already changed; if the email fails the manager sees the error and can retry.
-  await send({ to: u.email, ...inviteMail({ name: u.name, email: u.email, role: u.role, password }) });
-  res.json({ ok: true });
+  emailInBackground(u.email, inviteMail({ name: u.name, email: u.email, role: u.role, password }));
+  res.json({ ok: true, temp_password: password });
 }));
 
 app.get('/manager/alerts', ...mgr, wrap(async (_req, res) => {

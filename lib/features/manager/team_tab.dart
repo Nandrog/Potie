@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/models.dart';
 import '../../core/session.dart';
 import '../../widgets/common.dart';
+import '../../widgets/login_details.dart';
 
 class TeamTab extends StatefulWidget {
   const TeamTab({super.key});
@@ -27,14 +28,20 @@ class _TeamTabState extends State<TeamTab> {
   }
 
   Future<void> _enroll() async {
-    final u = await showModalBottomSheet<AppUser>(
+    final r = await showModalBottomSheet<EnrollResult>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
       builder: (_) => const _EnrollSheet(),
     );
     _load(); // refresh even if the sheet closed after a partial failure
-    if (u != null && mounted) toast(context, '${u.name} enrolled. Login details emailed.');
+    if (r != null && mounted && r.tempPassword != null) {
+      await showLoginDetails(context,
+          name: r.user.name,
+          email: r.user.email,
+          role: r.user.role.label,
+          password: r.tempPassword!);
+    }
   }
 
   @override
@@ -79,10 +86,15 @@ class _TeamTabState extends State<TeamTab> {
                                     }
                                   }
                                 } else if (v == 'resend') {
-                                  final r = await guarded(context,
-                                      () async => (await b.resendCredentials(u.id)) ?? '');
-                                  if (r != null && context.mounted) {
-                                    toast(context, 'New password emailed.');
+                                  final pw = await guarded(
+                                      context, () => b.resendCredentials(u.id));
+                                  if (pw != null && context.mounted) {
+                                    await showLoginDetails(context,
+                                        name: u.name,
+                                        email: u.email,
+                                        role: u.role.label,
+                                        password: pw,
+                                        renewed: true);
                                   }
                                 } else {
                                   await guarded(context,
@@ -95,7 +107,7 @@ class _TeamTabState extends State<TeamTab> {
                                     value: 'edit', child: Text('Edit name / login email')),
                                 const PopupMenuItem(
                                     value: 'resend',
-                                    child: Text('Email new login details')),
+                                    child: Text('New password / send login details')),
                                 PopupMenuItem(
                                     value: 'toggle',
                                     child: Text(u.active ? 'Disable' : 'Enable')),
@@ -242,13 +254,13 @@ class _EnrollSheetState extends State<_EnrollSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                'A temporary password is generated and emailed using your SMTP settings.',
+                'A temporary password is generated. You then send it to them by email, WhatsApp or SMS.',
                 style: TextStyle(color: Theme.of(context).hintColor, fontSize: 12),
               ),
               const SizedBox(height: 16),
               FilledButton(
                   onPressed: _busy ? null : _save,
-                  child: const Text('Enroll & send login email')),
+                  child: const Text('Enroll')),
             ],
           ),
         ),

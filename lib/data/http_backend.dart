@@ -297,12 +297,15 @@ class HttpBackend implements Backend {
       .toList();
 
   @override
-  Future<AppUser> enrollUser(
-          {required String name,
-          required String email,
-          required Role role}) async =>
-      AppUser.fromJson(await _post('/manager/users',
-          {'name': name, 'email': email, 'role': role.name}) as Map<String, dynamic>);
+  Future<EnrollResult> enrollUser(
+      {required String name,
+      required String email,
+      required Role role}) async {
+    final j = await _post('/manager/users',
+        {'name': name, 'email': email, 'role': role.name}) as Map<String, dynamic>;
+    return EnrollResult(AppUser.fromJson(j),
+        tempPassword: j['temp_password'] as String?);
+  }
 
   @override
   Future<void> setUserActive(String userId, bool active) =>
@@ -316,8 +319,8 @@ class HttpBackend implements Backend {
 
   @override
   Future<String?> resendCredentials(String userId) async {
-    await _post('/manager/users/$userId/resend');
-    return null; // emailed; never shown in the app
+    final j = await _post('/manager/users/$userId/resend') as Map<String, dynamic>;
+    return j['temp_password'] as String?;
   }
 
   @override
