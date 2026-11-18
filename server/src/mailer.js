@@ -34,6 +34,10 @@ async function send({ to, subject, text, html }) {
     port: s.port || 587,
     secure: !!s.secure,
     auth: s.username ? { user: s.username, pass: s.password } : undefined,
+    // Fail fast: some hosts silently block outgoing mail ports, which otherwise hangs for minutes.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
   try {
     await transport.sendMail({
@@ -41,7 +45,10 @@ async function send({ to, subject, text, html }) {
       to, subject, text, html,
     });
   } catch (err) {
-    const e = new Error(`Email failed: ${err.message}`);
+    const blocked = ['ETIMEDOUT', 'ESOCKET', 'ECONNECTION', 'ECONNREFUSED'].includes(err.code);
+    const e = new Error(blocked
+      ? `Could not reach the email server ${s.host}:${s.port || 587}. The hosting may block this port - try port 2525 with a provider such as Brevo.`
+      : `Email failed: ${err.message}`);
     e.status = 502;
     throw e;
   }
