@@ -10,6 +10,8 @@ String hm(DateTime d) => _time.format(d);
 String dateTime(DateTime d) => _dateTime.format(d);
 String dateOnly(DateTime d) => _date.format(d);
 
+String percent(double fraction) => '${(fraction * 100).round()}%';
+
 String minutesLabel(int m) {
   final h = m ~/ 60, r = m % 60;
   if (h == 0) return '$r min';

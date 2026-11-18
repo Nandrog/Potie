@@ -7,9 +7,12 @@
     "start": "node src/index.js",
     "db:push": "prisma db push && node scripts/rls.js",
     "seed": "node scripts/seed.js",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "release": "node scripts/release.js"
   },
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.45.0",

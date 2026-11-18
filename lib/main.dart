@@ -11,6 +11,7 @@ import 'features/auth/login_page.dart';
 import 'features/distributor/distributor_home.dart';
 import 'features/manager/manager_home.dart';
 import 'core/models.dart';
+import 'widgets/update_dialog.dart';
 
 /// Set at build time (see app.env):
 ///   flutter build apk --dart-define-from-file=app.env
@@ -74,10 +75,12 @@ class _Gate extends StatelessWidget {
     }
     final u = s.user;
     if (u == null) return const LoginPage();
-    return switch (u.role) {
-      Role.manager => const ManagerHome(),
-      Role.distributor => const DistributorHome(),
-    };
+    return _UpdateOnStart(
+      child: switch (u.role) {
+        Role.manager => const ManagerHome(),
+        Role.distributor => const DistributorHome(),
+      },
+    );
   }
 }
 
@@ -94,4 +97,29 @@ class _SetupError extends StatelessWidget {
                   child: Text(message, textAlign: TextAlign.center))),
         ),
       );
+}
+
+/// Looks for a newer release once each time the app is opened (Android only).
+class _UpdateOnStart extends StatefulWidget {
+  const _UpdateOnStart({required this.child});
+  final Widget child;
+  @override
+  State<_UpdateOnStart> createState() => _UpdateOnStartState();
+}
+
+class _UpdateOnStartState extends State<_UpdateOnStart> {
+  static bool _checked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (_checked) return;
+    _checked = true;
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (mounted) checkForUpdates(context, silent: true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

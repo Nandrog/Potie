@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import '../../widgets/update_dialog.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models.dart';
@@ -41,6 +43,9 @@ class ProfilePage extends StatelessWidget {
           const SizedBox(height: 24),
           const _SectionTitle('Appearance'),
           const _ThemeCard(),
+          const SizedBox(height: 24),
+          const _SectionTitle('App'),
+          const _UpdateCard(),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () {
@@ -253,4 +258,22 @@ class _ThemeCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _UpdateCard extends StatelessWidget {
+  const _UpdateCard();
+  @override
+  Widget build(BuildContext context) => Card(
+        child: ListTile(
+          leading: const Icon(Icons.system_update_alt),
+          title: FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (_, s) => Text(s.hasData
+                ? 'Arrows Bar ${s.data!.version} (${s.data!.buildNumber})'
+                : 'Arrows Bar'),
+          ),
+          subtitle: const Text('Tap to check for updates'),
+          onTap: () => checkForUpdates(context),
+        ),
+      );
 }
