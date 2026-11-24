@@ -69,6 +69,10 @@ abstract class Backend {
     required Role role,
   });
   Future<void> setUserActive(String userId, bool active);
+
+  /// Deletes a user: their login is removed and they disappear from every list,
+  /// but their name stays on past activity in the audit trail and reports.
+  Future<void> deleteUser(String userId);
   Future<AppUser> editUser(String userId,
       {required String name, required String email});
   /// Sets a new temporary password, emails it, lifts any lockout and closes

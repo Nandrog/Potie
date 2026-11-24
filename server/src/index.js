@@ -458,7 +458,7 @@ app.get('/users', authenticate, allow('manager'), wrap(async (req, res) => {
   const role = req.query.role;
   if (role && !['manager', 'distributor'].includes(role)) throw httpError(400, 'Bad role.');
   const rows = await prisma.user.findMany({
-    where: role ? { role } : {},
+    where: { deletedAt: null, ...(role ? { role } : {}) },
     orderBy: [{ role: 'asc' }, { name: 'asc' }],
   });
   res.json(rows.map(publicUser));
@@ -531,7 +531,7 @@ app.post('/manager/users', ...mgr, wrap(async (req, res) => {
 
 app.patch('/manager/users/:id', ...mgr, uuidParam, wrap(async (req, res) => {
   const u = await prisma.user.findUnique({ where: { id: req.params.id } });
-  if (!u) throw httpError(404, 'User not found.');
+  if (!u || u.deletedAt) throw httpError(404, 'User not found.');
 
   // Body with name/email (and no `active`) edits login details.
   if (typeof req.body.active !== 'boolean') {
@@ -553,9 +553,35 @@ app.patch('/manager/users/:id', ...mgr, uuidParam, wrap(async (req, res) => {
   res.json({ ok: true });
 }));
 
+// Delete a user: removes their login for good and hides them everywhere, but keeps
+// their name on past activity (audit trail, reports) so history stays accurate.
+// Their email is released so it can be enrolled again.
+app.delete('/manager/users/:id', ...mgr, uuidParam, wrap(async (req, res) => {
+  if (req.params.id === req.user.id) throw httpError(400, 'You cannot delete yourself.');
+  const u = await prisma.user.findUnique({ where: { id: req.params.id } });
+  if (!u || u.deletedAt) throw httpError(404, 'User not found.');
+
+  // Login first: without it they can no longer sign in, and their open sessions stop working.
+  const { error } = await supabase.auth.admin.deleteUser(u.authId);
+  if (error && !/not.?found/i.test(error.message)) throw httpError(502, error.message);
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: u.id },
+      data: {
+        deletedAt: new Date(), active: false, failedAttempts: 0, lockedUntil: null,
+        email: `deleted-${u.id}@removed.invalid`, // frees the real email for re-use
+      },
+    });
+    await tx.alert.updateMany({ where: { userId: u.id, resolvedAt: null }, data: { resolvedAt: new Date() } });
+    await audit(tx, req.user.id, 'USER_DELETED', `${u.name} (${u.role}) deleted`);
+  });
+  res.json({ ok: true });
+}));
+
 app.post('/manager/users/:id/resend', ...mgr, uuidParam, wrap(async (req, res) => {
   const u = await prisma.user.findUnique({ where: { id: req.params.id } });
-  if (!u) throw httpError(404, 'User not found.');
+  if (!u || u.deletedAt) throw httpError(404, 'User not found.');
   const password = tempPassword();
   // Also lifts any lockout ban (but never un-bans a manager-disabled account).
   const { error } = await supabase.auth.admin.updateUserById(u.authId,

@@ -48,6 +48,9 @@ model User {
   role      UserRole
   active    Boolean  @default(true)
   createdAt DateTime @default(now()) @map("created_at")
+  /// Set when the manager deletes the user: login removed, name kept so the
+  /// audit trail and reports still show who did what.
+  deletedAt DateTime? @map("deleted_at")
 
   // Sign-in protection: 3 wrong passwords lock the account for 10 seconds.
   failedAttempts Int       @default(0) @map("failed_attempts")

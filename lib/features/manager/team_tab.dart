@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/models.dart';
 import '../../core/session.dart';
+import '../../core/theme.dart';
 import '../../widgets/common.dart';
 import '../../widgets/login_details.dart';
 import '../../widgets/shell.dart';
@@ -100,6 +101,38 @@ class _TeamTabState extends State<TeamTab> {
                                         password: pw,
                                         renewed: true);
                                   }
+                                } else if (v == 'delete') {
+                                  final sure = await showDialog<bool>(
+                                    context: context,
+                                    builder: (c) => AlertDialog(
+                                      title: Text('Delete ${u.name}?'),
+                                      content: Text(
+                                          '${u.name} will no longer be able to sign in, and disappears from the team. '
+                                          'Their past activity stays in the audit trail and reports. '
+                                          'This cannot be undone.'),
+                                      actions: [
+                                        TextButton(
+                                            onPressed: () => Navigator.pop(c, false),
+                                            child: const Text('Cancel')),
+                                        FilledButton(
+                                          style: FilledButton.styleFrom(
+                                              backgroundColor: Brand.danger,
+                                              minimumSize: const Size(100, 40)),
+                                          onPressed: () => Navigator.pop(c, true),
+                                          child: const Text('Delete'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                  if (sure != true || !context.mounted) return;
+                                  final done = await guarded(context, () async {
+                                    await b.deleteUser(u.id);
+                                    return true;
+                                  });
+                                  if (done == true && context.mounted) {
+                                    toast(context, '${u.name} deleted.');
+                                  }
+                                  _load();
                                 } else {
                                   await guarded(context,
                                       () => b.setUserActive(u.id, !u.active));
@@ -115,6 +148,11 @@ class _TeamTabState extends State<TeamTab> {
                                 PopupMenuItem(
                                     value: 'toggle',
                                     child: Text(u.active ? 'Disable' : 'Enable')),
+                                const PopupMenuDivider(),
+                                const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Text('Delete user',
+                                        style: TextStyle(color: Brand.danger))),
                               ],
                             ),
                       isThreeLine: false,

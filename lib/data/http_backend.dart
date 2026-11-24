@@ -43,6 +43,7 @@ class HttpBackend implements Backend {
           'POST' => _http.post(uri, headers: headers, body: jsonEncode(body ?? {})),
           'PUT' => _http.put(uri, headers: headers, body: jsonEncode(body ?? {})),
           'PATCH' => _http.patch(uri, headers: headers, body: jsonEncode(body ?? {})),
+          'DELETE' => _http.delete(uri, headers: headers),
           _ => throw ArgumentError(method),
         };
         return f.timeout(const Duration(seconds: 75));
@@ -306,6 +307,9 @@ class HttpBackend implements Backend {
     return EnrollResult(AppUser.fromJson(j),
         tempPassword: j['temp_password'] as String?);
   }
+
+  @override
+  Future<void> deleteUser(String userId) => _send('DELETE', '/manager/users/$userId');
 
   @override
   Future<void> setUserActive(String userId, bool active) =>

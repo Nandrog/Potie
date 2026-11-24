@@ -535,6 +535,20 @@ class DemoBackend implements Backend {
   }
 
   @override
+  Future<void> deleteUser(String userId) async {
+    _need(Role.manager);
+    if (userId == _actor.id) throw BackendException('You cannot delete yourself.');
+    final i = _users.indexWhere((u) => u.id == userId);
+    if (i < 0) throw BackendException('User not found.');
+    final u = _users.removeAt(i);
+    _passwords.remove(u.email);
+    _failed.remove(u.id);
+    _lockedUntil.remove(u.id);
+    _alerts.removeWhere((a) => a.userId == u.id);
+    _log(_actor, 'USER_DELETED', '${u.name} (${u.role.label}) deleted');
+  }
+
+  @override
   Future<void> setUserActive(String userId, bool active) async {
     _need(Role.manager);
     final i = _users.indexWhere((u) => u.id == userId);

@@ -98,6 +98,33 @@ void main() {
     expect(u.name, 'New Distro');
   });
 
+  test('manager deletes a user: login gone, history kept, not themselves', () async {
+    final b = DemoBackend();
+    await b.signIn(mgrEmail, mgrPw);
+    final me = (await b.users()).firstWhere((u) => u.role == Role.manager);
+    await expectLater(b.deleteUser(me.id), throwsA(isA<BackendException>()));
+
+    // The distributor issues a pot, then gets deleted.
+    await b.signIn(distroEmail, distroPw);
+    final w = (await b.waiters()).first;
+    final pot = (await b.availablePots()).first;
+    await b.issueToken(
+        waiterId: w.id, potId: pot.id, minutes: 30, amount: 1000, method: PayMethod.cash);
+
+    await b.signIn(mgrEmail, mgrPw);
+    final d = (await b.users()).firstWhere((u) => u.role == Role.distributor);
+    await b.deleteUser(d.id);
+    expect((await b.users()).any((u) => u.id == d.id), isFalse);
+    await expectLater(b.deleteUser(d.id), throwsA(isA<BackendException>()));
+
+    final day = await b.daySummary(DateTime.now());
+    expect(day.audit.any((a) => a.action == 'USER_DELETED'), isTrue);
+    expect(day.audit.any((a) => a.actorName == d.name), isTrue); // their past activity stays
+
+    await b.signOut();
+    await expectLater(b.signIn(distroEmail, distroPw), throwsA(isA<BackendException>()));
+  });
+
   test('waiters have no login', () async {
     final b = DemoBackend();
     await expectLater(b.signIn('waiter1@potie.app', 'Waiter@123'),
