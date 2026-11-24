@@ -64,19 +64,24 @@ class MethodPicker extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) => SegmentedButton<PayMethod>(
+  Widget build(BuildContext context) => SizedBox(
+      width: double.infinity,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: SegmentedButton<PayMethod>(
         showSelectedIcon: false,
         segments: [
           for (final m in PayMethod.values)
             ButtonSegment(
               value: m,
               icon: Icon(_icons[m]),
-              label: Text(m == PayMethod.mobileMoney ? 'MoMo' : m.label),
+              label: Text(m == PayMethod.mobileMoney ? 'MoMo' : m.label,
+                  maxLines: 1, softWrap: false),
             ),
         ],
         selected: {value},
         onSelectionChanged: (s) => onChanged(s.first),
-      );
+      )));
 }
 
 class StatusChip extends StatelessWidget {

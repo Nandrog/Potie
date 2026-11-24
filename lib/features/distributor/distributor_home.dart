@@ -225,7 +225,7 @@ class _IssueTabState extends State<_IssueTab> {
             keyboardType: TextInputType.number,
             decoration: InputDecoration(
                 labelText: _timing == PayTiming.immediate
-                    ? 'Amount received'
+                    ? 'Amount'
                     : 'Amount to be paid'),
           ),
           const SizedBox(height: 18),
@@ -441,7 +441,7 @@ class _ExtendSheetState extends State<_ExtendSheet> {
             TextField(
               controller: _fee,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Fee received'),
+              decoration: const InputDecoration(labelText: 'Fee'),
             ),
             const SizedBox(height: 14),
             const Text('Received by'),
